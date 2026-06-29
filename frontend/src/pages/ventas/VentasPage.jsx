@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw, AlertCircle, Coffee } from 'lucide-react';
+import { RefreshCw, AlertCircle, Coffee, Wallet } from 'lucide-react';
 import { getMesas } from '../../api/mesas';
-import { getVentas, crearVenta, getCajaActiva } from '../../api/ventas';
+import { getVentas, crearVenta } from '../../api/ventas';
+import { getCajaActiva } from '../../api/caja';
 import { usePermisos } from '../../hooks/usePermisos';
 import { useAuth } from '../../hooks/useAuth';
 import TarjetaMesa from './components/TarjetaMesa';
@@ -26,31 +27,37 @@ export default function VentasPage() {
     enabled: puedeVer,
   });
 
-  // Pedidos pendientes para saber qué mesas están ocupadas
-  const { data: pedidosPendientes = [] } = useQuery({
-    queryKey: ['ventas', 'pendientes'],
-    queryFn: () => getVentas({ estado: 'pendiente' }),
+  // Caja activa — requerida para crear órdenes
+  const { data: cajaActiva, isLoading: cargandoCaja } = useQuery({
+    queryKey: ['caja-activa'],
+    queryFn: getCajaActiva,
     refetchInterval: 30_000,
     enabled: puedeVer,
   });
 
+  // Pedidos activos (pendiente + listo) para saber qué mesas están ocupadas
+  const { data: pedidosActivos = [] } = useQuery({
+    queryKey: ['ventas', 'activos'],
+    queryFn: () => getVentas({ estado: 'pendiente,listo' }),
+    refetchInterval: 15_000,
+    enabled: puedeVer,
+  });
+
   // Mapa mesa_id → pedido
-  const pedidoPorMesa = pedidosPendientes.reduce((acc, p) => {
+  const pedidoPorMesa = pedidosActivos.reduce((acc, p) => {
     if (p.mesa_id) acc[p.mesa_id] = p;
     return acc;
   }, {});
 
   // Crear nueva orden
   const { mutate: crearOrden } = useMutation({
-    mutationFn: async (mesa) => {
-      const cajaActiva = await getCajaActiva();
-      return crearVenta({
+    mutationFn: (mesa) =>
+      crearVenta({
         mesa_id: mesa.id,
         usuario_id: usuario.id,
         sesion_caja_id: cajaActiva?.id ?? null,
         nombre_cliente: 'Público General',
-      });
-    },
+      }),
     onSuccess: (pedido) => {
       queryClient.invalidateQueries({ queryKey: ['mesas'] });
       queryClient.invalidateQueries({ queryKey: ['ventas'] });
@@ -65,7 +72,7 @@ export default function VentasPage() {
       if (pedido) navigate(`/ventas/pedido/${pedido.id}`);
       return;
     }
-    if (mesa.estado === 'disponible' && puedeCrear) {
+    if (mesa.estado === 'disponible' && puedeCrear && cajaActiva) {
       setCreando(mesa.id);
       crearOrden(mesa);
     }
@@ -73,7 +80,7 @@ export default function VentasPage() {
 
   function esClickable(mesa) {
     if (mesa.estado === 'ocupada') return puedeVer && !!pedidoPorMesa[mesa.id];
-    if (mesa.estado === 'disponible') return puedeCrear;
+    if (mesa.estado === 'disponible') return puedeCrear && !!cajaActiva;
     return false;
   }
 
@@ -125,6 +132,23 @@ export default function VentasPage() {
         </button>
       </div>
 
+      {/* Banner sin caja */}
+      {!cargandoCaja && !cajaActiva && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl text-amber-700 dark:text-amber-400">
+          <Wallet className="w-5 h-5 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">No hay caja abierta</p>
+            <p className="text-xs mt-0.5">No puedes crear nuevas órdenes hasta abrir la caja.</p>
+          </div>
+          <Link
+            to="/caja"
+            className="ml-auto shrink-0 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors"
+          >
+            Ir a Caja
+          </Link>
+        </div>
+      )}
+
       {/* Leyenda */}
       <div className="flex flex-wrap gap-4 text-xs">
         {[
@@ -140,6 +164,11 @@ export default function VentasPage() {
         {!puedeCrear && (
           <span className="text-amber-600 dark:text-amber-400 font-medium">
             · Solo lectura (sin permiso para crear órdenes)
+          </span>
+        )}
+        {puedeCrear && !cajaActiva && (
+          <span className="text-amber-600 dark:text-amber-400 font-medium">
+            · Mesas bloqueadas (sin caja abierta)
           </span>
         )}
       </div>

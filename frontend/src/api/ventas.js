@@ -26,3 +26,9 @@ export const cobrarVenta = (pedido_id, datos) =>
 
 export const cancelarVenta = (pedido_id) =>
   api.post(`/ventas/${pedido_id}/cancelar`).then((r) => r.data.datos);
+
+export const getCocinaOrders = () =>
+  api.get('/ventas/cocina').then((r) => r.data.datos);
+
+export const marcarListo = (pedido_id) =>
+  api.patch(`/ventas/${pedido_id}/listo`).then((r) => r.data.datos);

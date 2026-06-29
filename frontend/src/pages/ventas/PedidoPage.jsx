@@ -3,14 +3,47 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, RefreshCw, Plus, Minus, Trash2, ShoppingCart,
-  Package, CreditCard, XCircle, AlertCircle, CheckCircle2,
+  Package, CreditCard, XCircle, AlertCircle, CheckCircle2, ChefHat, Printer,
 } from 'lucide-react';
 import { getVenta, agregarItem, actualizarItem, eliminarItem, cobrarVenta, cancelarVenta } from '../../api/ventas';
 import { getProductos } from '../../api/productos';
 import { getCategorias } from '../../api/categorias';
+import { getConfiguracion } from '../../api/configuracion';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermisos } from '../../hooks/usePermisos';
 import Modal from '../../components/ui/Modal';
+
+function imprimirTicketCocina(pedido) {
+  const filas = (pedido.detalles ?? [])
+    .map(d => `<tr><td style="padding:4px 0">${d.producto?.nombre ?? ''}</td><td style="text-align:center;padding:4px 8px">${d.cantidad}</td>${d.nota ? `<td style="font-style:italic;color:#555">${d.nota}</td>` : '<td></td>'}</tr>`)
+    .join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body{font-family:monospace;width:280px;margin:0 auto;font-size:13px;padding:8px}
+    h2{text-align:center;margin:4px 0;font-size:16px}
+    p{margin:2px 0}
+    hr{border:none;border-top:1px dashed #000;margin:8px 0}
+    table{width:100%;border-collapse:collapse}
+    th{text-align:left;border-bottom:1px solid #000;padding:4px 0}
+    @media print{@page{size:80mm auto;margin:4mm}}
+  </style></head><body>
+    <h2>★ COCINA ★</h2>
+    <hr/>
+    <p><b>Mesa:</b> ${pedido.mesa?.nombre ?? '—'}</p>
+    <p><b>Orden #${pedido.id}</b></p>
+    <p><b>Hora:</b> ${new Date().toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}</p>
+    <hr/>
+    <table>
+      <thead><tr><th>Producto</th><th style="text-align:center">Cant</th><th>Nota</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <hr/>
+    ${pedido.notas ? `<p><b>Nota general:</b> ${pedido.notas}</p><hr/>` : ''}
+  </body></html>`;
+
+  const win = window.open('', '_blank', 'width=380,height=500');
+  if (win) { win.document.write(html); win.document.close(); win.focus(); win.print(); }
+}
 
 const API_BASE = 'http://localhost:3001';
 
@@ -57,8 +90,17 @@ export default function PedidoPage() {
     }, {});
   }, [pedido]);
 
+  const { data: config = {} } = useQuery({
+    queryKey: ['configuracion'],
+    queryFn: getConfiguracion,
+    staleTime: 60_000,
+  });
+
   const total = parseFloat(pedido?.total ?? 0);
   const esPendiente = pedido?.estado === 'pendiente';
+  const esListo     = pedido?.estado === 'listo';
+  const puedeOperar = esPendiente || esListo;
+  const flujoFisico = config.flujo_cocina === 'fisico';
 
   // Mutaciones
   const agregar = useMutation({
@@ -134,10 +176,11 @@ export default function PedidoPage() {
             </h1>
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
               pedido.estado === 'pendiente'   ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
-              pedido.estado === 'completado'  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+              pedido.estado === 'listo'       ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+              pedido.estado === 'completado'  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
               'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
             }`}>
-              {pedido.estado}
+              {pedido.estado === 'listo' ? '✓ Listo' : pedido.estado}
             </span>
           </div>
         </div>
@@ -341,7 +384,24 @@ export default function PedidoPage() {
                 </span>
               </div>
 
-              {esPendiente && (
+              {/* Banner listo para servir */}
+              {esListo && (
+                <div className="flex items-center gap-2 justify-center py-2.5 rounded-xl bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-sm font-semibold">
+                  <ChefHat className="w-4 h-4" /> ¡Listo para servir!
+                </div>
+              )}
+
+              {/* Imprimir ticket (flujo físico) */}
+              {flujoFisico && esPendiente && (pedido.detalles?.length ?? 0) > 0 && (
+                <button
+                  onClick={() => imprimirTicketCocina(pedido)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl text-sm font-medium transition-colors"
+                >
+                  <Printer className="w-4 h-4" /> Imprimir ticket cocina
+                </button>
+              )}
+
+              {puedeOperar && (
                 <div className="space-y-2">
                   {puedeCobrar && (
                     <button
@@ -352,7 +412,7 @@ export default function PedidoPage() {
                       <CreditCard className="w-4 h-4" /> Cobrar
                     </button>
                   )}
-                  {puedeCancelar && (
+                  {puedeCancelar && esPendiente && (
                     <button
                       onClick={() => setModalCancelar(true)}
                       className="w-full flex items-center justify-center gap-2 py-2.5 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl text-sm font-medium transition-colors"
@@ -363,10 +423,10 @@ export default function PedidoPage() {
                 </div>
               )}
 
-              {!esPendiente && (
+              {!puedeOperar && (
                 <div className={`flex items-center gap-2 justify-center py-2 rounded-xl text-sm font-medium ${
                   pedido.estado === 'completado'
-                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
                     : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
                 }`}>
                   <CheckCircle2 className="w-4 h-4" />

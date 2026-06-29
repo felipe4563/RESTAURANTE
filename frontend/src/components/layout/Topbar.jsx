@@ -1,6 +1,6 @@
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../hooks/useTheme';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Menu, LogOut, Sun, Moon } from 'lucide-react';
 import api from '../../api/cliente';
 
@@ -48,11 +48,15 @@ export default function Topbar({ onToggleSidebar }) {
         {/* Separador */}
         <div className="w-px h-5 bg-gray-200 dark:bg-gray-600" />
 
-        {/* Usuario */}
-        <div className="text-right px-1">
-          <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 leading-tight">{usuario?.nombre}</p>
+        {/* Usuario — clic lleva al perfil */}
+        <Link
+          to="/perfil"
+          className="text-right px-1 group cursor-pointer"
+          title="Ver mi perfil"
+        >
+          <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 group-hover:text-amber-600 dark:group-hover:text-amber-400 leading-tight transition-colors">{usuario?.nombre}</p>
           <p className="text-xs text-gray-400 dark:text-gray-500 leading-tight">{usuario?.rol?.nombre}</p>
-        </div>
+        </Link>
 
         {/* Logout */}
         <button

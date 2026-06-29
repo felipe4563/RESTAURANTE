@@ -1,19 +1,23 @@
 import { NavLink } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { usePermisos } from '../../hooks/usePermisos';
+import { getConfiguracion, logoSrc } from '../../api/configuracion';
 import {
   LayoutDashboard, UtensilsCrossed, Wallet, BookOpen,
-  Package, Boxes, Truck, Users, UserCog, Shield, Settings, X,
+  Package, Boxes, Truck, Users, UserCog, Shield, Settings, X, BarChart2, ChefHat,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
   { to: '/',             label: 'Dashboard',     Icono: LayoutDashboard, siempre: true },
   { to: '/ventas',       label: 'Ventas / POS',  Icono: UtensilsCrossed, modulo: 'ventas',        accion: 'ver' },
+  { to: '/cocina',       label: 'Cocina',        Icono: ChefHat,         modulo: 'cocina',        accion: 'ver' },
   { to: '/caja',         label: 'Caja',          Icono: Wallet,          modulo: 'caja',          accion: 'ver' },
   { to: '/libro-caja',   label: 'Libro Caja',    Icono: BookOpen,        modulo: 'libro_caja',    accion: 'ver' },
   { to: '/productos',    label: 'Productos',     Icono: Package,         modulo: 'inventario',    accion: 'ver' },
   { to: '/inventario',   label: 'Inventario',    Icono: Boxes,           modulo: 'inventario',    accion: 'ajustar' },
   { to: '/compras',      label: 'Compras',       Icono: Truck,           modulo: 'compras',       accion: 'ver' },
   { to: '/clientes',     label: 'Clientes',      Icono: Users,           modulo: 'ventas',        accion: 'ver' },
+  { to: '/reportes',     label: 'Reportes',      Icono: BarChart2,       modulo: 'reportes',      accion: 'ver' },
   { to: '/usuarios',     label: 'Usuarios',      Icono: UserCog,         modulo: 'usuarios',      accion: 'ver' },
   { to: '/roles',        label: 'Roles',         Icono: Shield,          modulo: 'roles',         accion: 'ver' },
   { to: '/configuracion',label: 'Configuración', Icono: Settings,        modulo: 'configuracion', accion: 'ver' },
@@ -21,6 +25,13 @@ const NAV_ITEMS = [
 
 export default function Sidebar({ abierto, onCerrar }) {
   const { tienePermiso } = usePermisos();
+  const { data: config = {} } = useQuery({
+    queryKey: ['configuracion'],
+    queryFn: getConfiguracion,
+    staleTime: 60_000,
+  });
+  const nombreNegocio = config.nombre_negocio || 'Restaurante';
+  const logo = logoSrc(config.logo);
 
   const itemsVisibles = NAV_ITEMS.filter(
     (item) => item.siempre || tienePermiso(item.modulo, item.accion)
@@ -47,12 +58,15 @@ export default function Sidebar({ abierto, onCerrar }) {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700/60">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shrink-0">
-              <UtensilsCrossed className="w-4 h-4 text-white" />
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg shrink-0 overflow-hidden bg-blue-600 flex items-center justify-center">
+              {logo
+                ? <img src={logo} alt="Logo" className="w-full h-full object-cover" />
+                : <UtensilsCrossed className="w-4 h-4 text-white" />
+              }
             </div>
-            <div>
-              <p className="text-sm font-bold text-gray-900 dark:text-white leading-tight">Restaurante</p>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-gray-900 dark:text-white leading-tight truncate">{nombreNegocio}</p>
               <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">Sistema de Gestión</p>
             </div>
           </div>
