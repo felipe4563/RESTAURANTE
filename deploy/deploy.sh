@@ -1,9 +1,9 @@
 #!/bin/bash
-# Script de actualización — ejecutar en el VPS desde /var/www/restaurante
+# Script de actualización — ejecutar en el VPS desde /home/ubuntu/SISTEMAS/RESTAURANTE
 # Uso: bash deploy/deploy.sh
 
 set -e
-cd /var/www/restaurante
+cd /home/ubuntu/SISTEMAS/RESTAURANTE
 
 echo "==> Obteniendo cambios..."
 git pull origin main
@@ -21,5 +21,5 @@ echo "==> Recargando Nginx..."
 sudo nginx -t && sudo systemctl reload nginx
 
 echo ""
-echo "✓ Despliegue completado"
+echo "Despliegue completado"
 pm2 status restaurante-api
