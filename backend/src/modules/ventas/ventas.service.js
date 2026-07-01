@@ -33,10 +33,21 @@ async function obtener(id) {
   return p;
 }
 
-async function crear({ mesa_id, usuario_id, cliente_id, sesion_caja_id, notas, nombre_cliente, documento_cliente, tipo_documento }) {
-  const mesa = await Mesa.findByPk(mesa_id);
-  if (!mesa) throw Object.assign(new Error('Mesa no encontrada'), { status: 404 });
+async function _siguienteNumeroLlevar() {
+  const inicio = new Date();
+  inicio.setHours(0, 0, 0, 0);
+  const fin = new Date();
+  fin.setHours(23, 59, 59, 999);
+  const count = await Pedido.count({
+    where: {
+      tipo: 'llevar',
+      creado_en: { [Op.between]: [inicio, fin] },
+    },
+  });
+  return count + 1;
+}
 
+async function crear({ mesa_id, tipo = 'mesa', usuario_id, cliente_id, sesion_caja_id, notas, nombre_cliente, documento_cliente, tipo_documento }) {
   if (!sesion_caja_id) {
     throw Object.assign(new Error('No hay caja abierta. Abre la caja antes de crear una orden.'), { status: 409 });
   }
@@ -45,19 +56,39 @@ async function crear({ mesa_id, usuario_id, cliente_id, sesion_caja_id, notas, n
     throw Object.assign(new Error('La sesión de caja no está abierta.'), { status: 409 });
   }
 
+  if (tipo === 'mesa') {
+    const mesa = await Mesa.findByPk(mesa_id);
+    if (!mesa) throw Object.assign(new Error('Mesa no encontrada'), { status: 404 });
+
+    const pedido = await Pedido.create({
+      mesa_id,
+      tipo: 'mesa',
+      usuario_id,
+      cliente_id,
+      sesion_caja_id,
+      notas,
+      nombre_cliente: nombre_cliente || 'Público General',
+      documento_cliente,
+      tipo_documento: tipo_documento || 'Ticket',
+    });
+    await mesa.update({ estado: 'ocupada' });
+    return obtener(pedido.id);
+  }
+
+  // tipo === 'llevar'
+  const numero_llevar = await _siguienteNumeroLlevar();
   const pedido = await Pedido.create({
-    mesa_id,
+    mesa_id: null,
+    tipo: 'llevar',
+    numero_llevar,
     usuario_id,
     cliente_id,
     sesion_caja_id,
     notas,
-    nombre_cliente: nombre_cliente || 'Público General',
+    nombre_cliente: nombre_cliente || 'Cliente',
     documento_cliente,
     tipo_documento: tipo_documento || 'Ticket',
   });
-
-  await mesa.update({ estado: 'ocupada' });
-
   return obtener(pedido.id);
 }
 
@@ -128,9 +159,11 @@ async function cobrar(pedido_id, usuario_id, { metodo_pago, monto_recibido, desc
       propina,
     }, { transaction: t });
 
-    const pendientes = await Pedido.count({ where: { mesa_id: pedido.mesa_id, estado: 'pendiente' }, transaction: t });
-    if (pendientes === 0) {
-      await Mesa.update({ estado: 'disponible' }, { where: { id: pedido.mesa_id }, transaction: t });
+    if (pedido.tipo !== 'llevar' && pedido.mesa_id) {
+      const pendientes = await Pedido.count({ where: { mesa_id: pedido.mesa_id, estado: 'pendiente' }, transaction: t });
+      if (pendientes === 0) {
+        await Mesa.update({ estado: 'disponible' }, { where: { id: pedido.mesa_id }, transaction: t });
+      }
     }
 
     await LibroCaja.create({
@@ -174,9 +207,11 @@ async function cancelar(pedido_id, usuario_id) {
 
   await pedido.update({ estado: 'cancelado' });
 
-  const pendientes = await Pedido.count({ where: { mesa_id: pedido.mesa_id, estado: 'pendiente' } });
-  if (pendientes === 0) {
-    await Mesa.update({ estado: 'disponible' }, { where: { id: pedido.mesa_id } });
+  if (pedido.tipo !== 'llevar' && pedido.mesa_id) {
+    const pendientes = await Pedido.count({ where: { mesa_id: pedido.mesa_id, estado: 'pendiente' } });
+    if (pendientes === 0) {
+      await Mesa.update({ estado: 'disponible' }, { where: { id: pedido.mesa_id } });
+    }
   }
 
   return obtener(pedido_id);

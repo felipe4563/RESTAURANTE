@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw, AlertCircle, Coffee, Wallet } from 'lucide-react';
+import { RefreshCw, AlertCircle, Coffee, Wallet, ShoppingBag } from 'lucide-react';
 import { getMesas } from '../../api/mesas';
 import { getVentas, crearVenta } from '../../api/ventas';
 import { getCajaActiva } from '../../api/caja';
 import { usePermisos } from '../../hooks/usePermisos';
 import { useAuth } from '../../hooks/useAuth';
 import TarjetaMesa from './components/TarjetaMesa';
+import Modal from '../../components/ui/Modal';
 
 export default function VentasPage() {
   const { tienePermiso } = usePermisos();
@@ -15,6 +16,8 @@ export default function VentasPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [creando, setCreando] = useState(null); // mesa_id en proceso
+  const [modalLlevar, setModalLlevar] = useState(false);
+  const [creandoLlevar, setCreandoLlevar] = useState(false);
 
   const puedeVer    = tienePermiso('ventas', 'ver');
   const puedeCrear  = tienePermiso('ventas', 'crear');
@@ -49,10 +52,11 @@ export default function VentasPage() {
     return acc;
   }, {});
 
-  // Crear nueva orden
+  // Crear nueva orden (mesa)
   const { mutate: crearOrden } = useMutation({
     mutationFn: (mesa) =>
       crearVenta({
+        tipo: 'mesa',
         mesa_id: mesa.id,
         usuario_id: usuario.id,
         sesion_caja_id: cajaActiva?.id ?? null,
@@ -64,6 +68,25 @@ export default function VentasPage() {
       navigate(`/ventas/pedido/${pedido.id}`);
     },
     onSettled: () => setCreando(null),
+  });
+
+  // Crear orden para llevar
+  const { mutate: crearOrdenLlevar } = useMutation({
+    mutationFn: (nombre_cliente) =>
+      crearVenta({
+        tipo: 'llevar',
+        usuario_id: usuario.id,
+        sesion_caja_id: cajaActiva?.id ?? null,
+        nombre_cliente: nombre_cliente || 'Cliente',
+      }),
+    onSuccess: (pedido) => {
+      queryClient.invalidateQueries({ queryKey: ['ventas'] });
+      navigate(`/ventas/pedido/${pedido.id}`);
+    },
+    onError: (err) => {
+      alert(`Error al crear pedido para llevar: ${err?.message ?? 'Error desconocido'}`);
+    },
+    onSettled: () => setCreandoLlevar(false),
   });
 
   function handleClickMesa(mesa) {
@@ -115,21 +138,32 @@ export default function VentasPage() {
   return (
     <div className="space-y-6">
       {/* Encabezado */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">Plano de Mesas</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
             {mesas.length} mesas · actualiza cada 30s
           </p>
         </div>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
-          Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          {puedeCrear && cajaActiva && (
+            <button
+              onClick={() => setModalLlevar(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-orange-500 hover:bg-orange-600 text-white transition-colors"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              Para llevar
+            </button>
+          )}
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+            Actualizar
+          </button>
+        </div>
       </div>
 
       {/* Banner sin caja */}
@@ -221,6 +255,58 @@ export default function VentasPage() {
           </div>
         </div>
       )}
+
+      {/* Modal para llevar */}
+      {modalLlevar && (
+        <ModalLlevar
+          cargando={creandoLlevar}
+          onClose={() => setModalLlevar(false)}
+          onConfirmar={(nombre) => {
+            setCreandoLlevar(true);
+            setModalLlevar(false);
+            crearOrdenLlevar(nombre);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function ModalLlevar({ onClose, onConfirmar, cargando }) {
+  const [nombre, setNombre] = useState('');
+  return (
+    <Modal titulo="Nuevo pedido para llevar" onClose={onClose} ancho="max-w-sm">
+      <div className="space-y-4">
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+            Nombre del cliente
+          </label>
+          <input
+            type="text"
+            autoFocus
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && nombre.trim() && onConfirmar(nombre.trim())}
+            placeholder="Ej: Juan, Mesa exterior..."
+            className="w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500 transition"
+          />
+        </div>
+        <div className="flex justify-end gap-3 pt-1">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => onConfirmar(nombre.trim() || 'Cliente')}
+            disabled={cargando}
+            className="px-5 py-2 rounded-xl text-sm bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold transition-colors"
+          >
+            {cargando ? 'Creando...' : 'Crear pedido'}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }

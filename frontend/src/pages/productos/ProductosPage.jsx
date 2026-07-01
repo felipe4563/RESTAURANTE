@@ -5,8 +5,9 @@ import { getCategorias, crearCategoria, actualizarCategoria, eliminarCategoria }
 import { getProductos, crearProducto, actualizarProducto, eliminarProducto, subirImagenProducto } from '../../api/productos';
 import { usePermisos } from '../../hooks/usePermisos';
 import Modal from '../../components/ui/Modal';
+import { BASE_URL } from '../../api/configuracion';
 
-const API_BASE = 'http://localhost:3001';
+const API_BASE = BASE_URL;
 
 const TABS = [
   { id: 'categorias', label: 'Categorías', Icono: Tag },

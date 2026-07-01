@@ -3,10 +3,12 @@ const sequelize = require('../config/database');
 
 const Pedido = sequelize.define('Pedido', {
   id: { type: DataTypes.INTEGER.UNSIGNED, primaryKey: true, autoIncrement: true },
-  mesa_id: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
+  mesa_id: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
   usuario_id: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
   cliente_id: { type: DataTypes.INTEGER.UNSIGNED },
   sesion_caja_id: { type: DataTypes.INTEGER.UNSIGNED },
+  tipo: { type: DataTypes.ENUM('mesa', 'llevar'), defaultValue: 'mesa' },
+  numero_llevar: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
   estado: { type: DataTypes.ENUM('pendiente','listo','completado','cancelado'), defaultValue: 'pendiente' },
   tipo_documento: { type: DataTypes.STRING(50), defaultValue: 'Ticket' },
   nombre_cliente: { type: DataTypes.STRING(255), defaultValue: 'Público General' },

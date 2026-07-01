@@ -8,7 +8,7 @@ import {
 import { getVenta, agregarItem, actualizarItem, eliminarItem, cobrarVenta, cancelarVenta } from '../../api/ventas';
 import { getProductos } from '../../api/productos';
 import { getCategorias } from '../../api/categorias';
-import { getConfiguracion } from '../../api/configuracion';
+import { getConfiguracion, BASE_URL } from '../../api/configuracion';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermisos } from '../../hooks/usePermisos';
 import Modal from '../../components/ui/Modal';
@@ -29,8 +29,10 @@ function imprimirTicketCocina(pedido) {
   </style></head><body>
     <h2>★ COCINA ★</h2>
     <hr/>
-    <p><b>Mesa:</b> ${pedido.mesa?.nombre ?? '—'}</p>
-    <p><b>Orden #${pedido.id}</b></p>
+    ${pedido.tipo === 'llevar'
+      ? `<p><b>PARA LLEVAR</b></p><p><b>Cliente:</b> ${pedido.nombre_cliente}</p><p><b>Orden #${String(pedido.numero_llevar ?? pedido.id).padStart(3,'0')}</b></p>`
+      : `<p><b>Mesa:</b> ${pedido.mesa?.nombre ?? '—'}</p><p><b>Orden #${pedido.id}</b></p>`}
+
     <p><b>Hora:</b> ${new Date().toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}</p>
     <hr/>
     <table>
@@ -45,7 +47,7 @@ function imprimirTicketCocina(pedido) {
   if (win) { win.document.write(html); win.document.close(); win.focus(); win.print(); }
 }
 
-const API_BASE = 'http://localhost:3001';
+const API_BASE = BASE_URL;
 
 export default function PedidoPage() {
   const { id } = useParams();
@@ -172,7 +174,9 @@ export default function PedidoPage() {
           </button>
           <div className="min-w-0">
             <h1 className="font-bold text-gray-800 dark:text-gray-100 truncate">
-              {pedido.mesa?.nombre} — Orden #{pedido.id}
+              {pedido.tipo === 'llevar'
+                ? `Para llevar #${String(pedido.numero_llevar ?? pedido.id).padStart(3, '0')} — ${pedido.nombre_cliente}`
+                : `${pedido.mesa?.nombre} — Orden #${pedido.id}`}
             </h1>
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
               pedido.estado === 'pendiente'   ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :

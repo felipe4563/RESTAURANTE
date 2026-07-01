@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, CheckCircle2, ChefHat, Clock, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChefHat, Clock, RefreshCw, ShoppingBag } from 'lucide-react';
 import { getCocinaOrders, marcarListo } from '../../api/ventas';
 import { usePermisos } from '../../hooks/usePermisos';
 
@@ -36,8 +36,10 @@ export default function CocinaPage() {
     );
   }
 
-  const pendientes = pedidos.filter(p => p.estado === 'pendiente');
-  const listos     = pedidos.filter(p => p.estado === 'listo');
+  const pendientesMesa   = pedidos.filter(p => p.estado === 'pendiente' && p.tipo !== 'llevar');
+  const listosMesa       = pedidos.filter(p => p.estado === 'listo'     && p.tipo !== 'llevar');
+  const pendientesLlevar = pedidos.filter(p => p.estado === 'pendiente' && p.tipo === 'llevar');
+  const listosLlevar     = pedidos.filter(p => p.estado === 'listo'     && p.tipo === 'llevar');
 
   return (
     <div className="space-y-6">
@@ -76,64 +78,101 @@ export default function CocinaPage() {
           <p className="text-sm">Los nuevos pedidos aparecerán aquí automáticamente</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Nuevos pedidos */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-              <h2 className="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                Nuevos
-              </h2>
-              <span className="ml-auto bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">
-                {pendientes.length}
-              </span>
+        <div className="space-y-8">
+          {/* ── SECCIÓN MESAS ── */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <ChefHat className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <h2 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Mesas</h2>
             </div>
-
-            {pendientes.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 p-8 text-center text-gray-400 dark:text-gray-600 text-sm">
-                Sin pedidos nuevos
-              </div>
-            ) : (
-              pendientes.map(p => (
-                <PedidoCard
-                  key={p.id}
-                  pedido={p}
-                  onListo={() => marcar.mutate(p.id)}
-                  cargando={marcar.isPending && marcar.variables === p.id}
-                />
-              ))
-            )}
-          </section>
-
-          {/* Listos */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-              <h2 className="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                Listo para servir
-              </h2>
-              <span className="ml-auto bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold px-2 py-0.5 rounded-full">
-                {listos.length}
-              </span>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <section className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                  <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Nuevos</h3>
+                  <span className="ml-auto bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">
+                    {pendientesMesa.length}
+                  </span>
+                </div>
+                {pendientesMesa.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 p-6 text-center text-gray-400 dark:text-gray-600 text-sm">
+                    Sin pedidos nuevos
+                  </div>
+                ) : (
+                  pendientesMesa.map(p => (
+                    <PedidoCard key={p.id} pedido={p} onListo={() => marcar.mutate(p.id)} cargando={marcar.isPending && marcar.variables === p.id} />
+                  ))
+                )}
+              </section>
+              <section className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                  <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Listo para servir</h3>
+                  <span className="ml-auto bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold px-2 py-0.5 rounded-full">
+                    {listosMesa.length}
+                  </span>
+                </div>
+                {listosMesa.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 p-6 text-center text-gray-400 dark:text-gray-600 text-sm">
+                    Ninguno listo aún
+                  </div>
+                ) : (
+                  listosMesa.map(p => <PedidoCard key={p.id} pedido={p} />)
+                )}
+              </section>
             </div>
+          </div>
 
-            {listos.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 p-8 text-center text-gray-400 dark:text-gray-600 text-sm">
-                Ninguno listo aún
-              </div>
-            ) : (
-              listos.map(p => (
-                <PedidoCard key={p.id} pedido={p} />
-              ))
-            )}
-          </section>
+          {/* ── SECCIÓN PARA LLEVAR ── */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <ShoppingBag className="w-4 h-4 text-orange-500" />
+              <h2 className="text-sm font-bold text-orange-500 uppercase tracking-wider">Para llevar</h2>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <section className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                  <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Nuevos</h3>
+                  <span className="ml-auto bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-bold px-2 py-0.5 rounded-full">
+                    {pendientesLlevar.length}
+                  </span>
+                </div>
+                {pendientesLlevar.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 p-6 text-center text-gray-400 dark:text-gray-600 text-sm">
+                    Sin pedidos para llevar
+                  </div>
+                ) : (
+                  pendientesLlevar.map(p => (
+                    <PedidoCard key={p.id} pedido={p} onListo={() => marcar.mutate(p.id)} cargando={marcar.isPending && marcar.variables === p.id} esLlevar />
+                  ))
+                )}
+              </section>
+              <section className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                  <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Listo para entregar</h3>
+                  <span className="ml-auto bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold px-2 py-0.5 rounded-full">
+                    {listosLlevar.length}
+                  </span>
+                </div>
+                {listosLlevar.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 p-6 text-center text-gray-400 dark:text-gray-600 text-sm">
+                    Ninguno listo aún
+                  </div>
+                ) : (
+                  listosLlevar.map(p => <PedidoCard key={p.id} pedido={p} esLlevar />)
+                )}
+              </section>
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function PedidoCard({ pedido, onListo, cargando }) {
+function PedidoCard({ pedido, onListo, cargando, esLlevar }) {
   const esNuevo = pedido.estado === 'pendiente';
 
   return (
@@ -146,9 +185,20 @@ function PedidoCard({ pedido, onListo, cargando }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-gray-900 dark:text-white text-base">
-              {pedido.mesa?.nombre}
-            </span>
+            {esLlevar ? (
+              <>
+                <span className="font-bold text-orange-600 dark:text-orange-400 text-base">
+                  #{String(pedido.numero_llevar ?? pedido.id).padStart(3, '0')}
+                </span>
+                <span className="font-semibold text-gray-900 dark:text-white text-base">
+                  {pedido.nombre_cliente}
+                </span>
+              </>
+            ) : (
+              <span className="font-bold text-gray-900 dark:text-white text-base">
+                {pedido.mesa?.nombre}
+              </span>
+            )}
             <span className="text-xs text-gray-400 dark:text-gray-500">#{pedido.id}</span>
           </div>
           <div className="flex items-center gap-1 mt-0.5 text-xs text-gray-400 dark:text-gray-500">

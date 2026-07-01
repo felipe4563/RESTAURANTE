@@ -12,8 +12,8 @@ async function obtener(req, res, next) {
 
 async function crear(req, res, next) {
   try {
-    const { mesa_id } = req.body;
-    if (!mesa_id) return res.status(400).json({ ok: false, mensaje: 'mesa_id es requerido' });
+    const { mesa_id, tipo = 'mesa' } = req.body;
+    if (tipo === 'mesa' && !mesa_id) return res.status(400).json({ ok: false, mensaje: 'mesa_id es requerido' });
     const datos = { ...req.body, usuario_id: req.usuario.id };
     res.status(201).json({ ok: true, datos: await svc.crear(datos) });
   } catch (err) { next(err); }
