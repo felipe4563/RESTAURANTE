@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, AlertCircle, Coffee, Wallet, ShoppingBag } from 'lucide-react';
@@ -9,6 +9,7 @@ import { usePermisos } from '../../hooks/usePermisos';
 import { useAuth } from '../../hooks/useAuth';
 import TarjetaMesa from './components/TarjetaMesa';
 import Modal from '../../components/ui/Modal';
+import socket from '../../socket';
 
 export default function VentasPage() {
   const { tienePermiso } = usePermisos();
@@ -26,7 +27,6 @@ export default function VentasPage() {
   const { data: mesas = [], isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['mesas'],
     queryFn: getMesas,
-    refetchInterval: 30_000,
     enabled: puedeVer,
   });
 
@@ -34,7 +34,7 @@ export default function VentasPage() {
   const { data: cajaActiva, isLoading: cargandoCaja } = useQuery({
     queryKey: ['caja-activa'],
     queryFn: getCajaActiva,
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
     enabled: puedeVer,
   });
 
@@ -42,9 +42,18 @@ export default function VentasPage() {
   const { data: pedidosActivos = [] } = useQuery({
     queryKey: ['ventas', 'activos'],
     queryFn: () => getVentas({ estado: 'pendiente,listo' }),
-    refetchInterval: 15_000,
     enabled: puedeVer,
   });
+
+  // Actualización en tiempo real vía Socket.io
+  useEffect(() => {
+    function onActualizar() {
+      queryClient.invalidateQueries({ queryKey: ['mesas'] });
+      queryClient.invalidateQueries({ queryKey: ['ventas'] });
+    }
+    socket.on('restaurante:actualizar', onActualizar);
+    return () => socket.off('restaurante:actualizar', onActualizar);
+  }, [queryClient]);
 
   // Mapa mesa_id → pedido
   const pedidoPorMesa = pedidosActivos.reduce((acc, p) => {

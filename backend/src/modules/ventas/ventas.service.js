@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const { Pedido, DetallePedido, Mesa, Producto, Cliente, SesionCaja, LibroCaja, RegistroInventario, sequelize } = require('../../models');
+const { emitir } = require('../../socket');
 
 const INCLUDE_PEDIDO_COMPLETO = [
   { model: Mesa, as: 'mesa', attributes: ['id', 'nombre', 'estado'] },
@@ -72,7 +73,9 @@ async function crear({ mesa_id, tipo = 'mesa', usuario_id, cliente_id, sesion_ca
       tipo_documento: tipo_documento || 'Ticket',
     });
     await mesa.update({ estado: 'ocupada' });
-    return obtener(pedido.id);
+    const resultado = await obtener(pedido.id);
+    emitir('restaurante:actualizar', { tipo: 'pedido_nuevo' });
+    return resultado;
   }
 
   // tipo === 'llevar'
@@ -89,7 +92,9 @@ async function crear({ mesa_id, tipo = 'mesa', usuario_id, cliente_id, sesion_ca
     documento_cliente,
     tipo_documento: tipo_documento || 'Ticket',
   });
-  return obtener(pedido.id);
+  const resultado = await obtener(pedido.id);
+  emitir('restaurante:actualizar', { tipo: 'pedido_nuevo' });
+  return resultado;
 }
 
 async function agregarItem(pedido_id, { producto_id, cantidad = 1, nota }) {
@@ -110,6 +115,7 @@ async function agregarItem(pedido_id, { producto_id, cantidad = 1, nota }) {
   });
 
   await _recalcularTotal(pedido_id);
+  emitir('restaurante:actualizar', { tipo: 'pedido_items' });
   return item;
 }
 
@@ -118,6 +124,7 @@ async function actualizarItem(pedido_id, item_id, { cantidad, nota, estado }) {
   if (!item) throw Object.assign(new Error('Item no encontrado'), { status: 404 });
   await item.update({ cantidad, nota, estado });
   await _recalcularTotal(pedido_id);
+  emitir('restaurante:actualizar', { tipo: 'pedido_items' });
   return item;
 }
 
@@ -128,6 +135,7 @@ async function eliminarItem(pedido_id, item_id) {
   if (!item) throw Object.assign(new Error('Item no encontrado'), { status: 404 });
   await item.destroy();
   await _recalcularTotal(pedido_id);
+  emitir('restaurante:actualizar', { tipo: 'pedido_items' });
 }
 
 async function cobrar(pedido_id, usuario_id, { metodo_pago, monto_recibido, descuento = 0, propina = 0 }) {
@@ -197,7 +205,9 @@ async function cobrar(pedido_id, usuario_id, { metodo_pago, monto_recibido, desc
     }
   });
 
-  return obtener(pedido_id);
+  const cobrado = await obtener(pedido_id);
+  emitir('restaurante:actualizar', { tipo: 'pedido_cobrado' });
+  return cobrado;
 }
 
 async function cancelar(pedido_id, usuario_id) {
@@ -214,7 +224,9 @@ async function cancelar(pedido_id, usuario_id) {
     }
   }
 
-  return obtener(pedido_id);
+  const cancelado = await obtener(pedido_id);
+  emitir('restaurante:actualizar', { tipo: 'pedido_cancelado' });
+  return cancelado;
 }
 
 async function _recalcularTotal(pedido_id) {
@@ -230,7 +242,9 @@ async function marcarListo(pedido_id) {
   if (!pedido) throw Object.assign(new Error('Pedido no encontrado'), { status: 404 });
   if (pedido.estado !== 'pendiente') throw Object.assign(new Error('Solo pedidos pendientes pueden marcarse como listos'), { status: 409 });
   await pedido.update({ estado: 'listo' });
-  return obtener(pedido_id);
+  const listo = await obtener(pedido_id);
+  emitir('restaurante:actualizar', { tipo: 'pedido_listo' });
+  return listo;
 }
 
 module.exports = { listar, listarCocina, obtener, crear, agregarItem, actualizarItem, eliminarItem, cobrar, cancelar, marcarListo };

@@ -64,6 +64,8 @@ export default function PedidoPage() {
   const [modalCobrar, setModalCobrar] = useState(false);
   const [modalCancelar, setModalCancelar] = useState(false);
   const [tabMobile, setTabMobile] = useState('productos'); // 'productos' | 'orden'
+  const [notaEditando, setNotaEditando] = useState(null); // item.id o null
+  const [textoNota, setTextoNota] = useState('');
 
   // Pedido
   const { data: pedido, isLoading: cargandoPedido } = useQuery({
@@ -113,6 +115,14 @@ export default function PedidoPage() {
   const actualizar = useMutation({
     mutationFn: ({ item_id, cantidad }) => actualizarItem(id, item_id, { cantidad }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['venta', id] }),
+  });
+
+  const guardarNota = useMutation({
+    mutationFn: ({ item_id, nota }) => actualizarItem(id, item_id, { nota }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['venta', id] });
+      setNotaEditando(null);
+    },
   });
 
   const quitar = useMutation({
@@ -333,47 +343,96 @@ export default function PedidoPage() {
                 </div>
               ) : (
                 pedido.detalles.map(item => (
-                  <div key={item.id} className="flex items-center gap-3 px-4 py-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-                        {item.producto?.nombre}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        Bs {parseFloat(item.precio).toFixed(2)} c/u
-                      </p>
-                    </div>
-                    {esPendiente && puedeCrear ? (
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          onClick={() => decrementar(item)}
-                          className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
-                        >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="w-6 text-center text-sm font-semibold text-gray-800 dark:text-gray-100">
-                          {item.cantidad}
-                        </span>
-                        <button
-                          onClick={() => incrementar(item)}
-                          className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
-                        >
-                          <Plus className="w-3 h-3" />
-                        </button>
+                  <div key={item.id} className="px-4 py-3 space-y-1.5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+                          {item.producto?.nombre}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          Bs {parseFloat(item.precio).toFixed(2)} c/u
+                        </p>
                       </div>
-                    ) : (
-                      <span className="text-sm font-semibold text-gray-600 dark:text-gray-300 shrink-0">×{item.cantidad}</span>
-                    )}
-                    <p className="text-sm font-bold text-gray-800 dark:text-gray-100 w-16 text-right shrink-0">
-                      Bs {(parseFloat(item.precio) * item.cantidad).toFixed(2)}
-                    </p>
-                    {esPendiente && puedeCrear && (
-                      <button
-                        onClick={() => quitar.mutate(item.id)}
-                        className="shrink-0 p-1 rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                      {esPendiente && puedeCrear ? (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => decrementar(item)}
+                            className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="w-6 text-center text-sm font-semibold text-gray-800 dark:text-gray-100">
+                            {item.cantidad}
+                          </span>
+                          <button
+                            onClick={() => incrementar(item)}
+                            className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-300 shrink-0">×{item.cantidad}</span>
+                      )}
+                      <p className="text-sm font-bold text-gray-800 dark:text-gray-100 w-16 text-right shrink-0">
+                        Bs {(parseFloat(item.precio) * item.cantidad).toFixed(2)}
+                      </p>
+                      {esPendiente && puedeCrear && (
+                        <button
+                          onClick={() => quitar.mutate(item.id)}
+                          className="shrink-0 p-1 rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Nota por item */}
+                    {esPendiente && puedeCrear ? (
+                      notaEditando === item.id ? (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            autoFocus
+                            value={textoNota}
+                            onChange={e => setTextoNota(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') guardarNota.mutate({ item_id: item.id, nota: textoNota });
+                              if (e.key === 'Escape') setNotaEditando(null);
+                            }}
+                            placeholder="Ej: sin cebolla, bien cocido..."
+                            className="flex-1 text-xs border border-blue-300 dark:border-blue-600 rounded-lg px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                          <button
+                            onClick={() => guardarNota.mutate({ item_id: item.id, nota: textoNota })}
+                            className="text-xs font-semibold text-blue-600 dark:text-blue-400 px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                          >
+                            OK
+                          </button>
+                          <button
+                            onClick={() => setNotaEditando(null)}
+                            className="text-xs text-gray-400 px-1 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : item.nota ? (
+                        <button
+                          onClick={() => { setNotaEditando(item.id); setTextoNota(item.nota); }}
+                          className="text-xs text-amber-600 dark:text-amber-400 italic text-left hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
+                        >
+                          Nota: {item.nota}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => { setNotaEditando(item.id); setTextoNota(''); }}
+                          className="text-xs text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
+                        >
+                          + agregar nota
+                        </button>
+                      )
+                    ) : item.nota ? (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 italic">Nota: {item.nota}</p>
+                    ) : null}
                   </div>
                 ))
               )}

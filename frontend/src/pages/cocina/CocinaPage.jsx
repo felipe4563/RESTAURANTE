@@ -1,7 +1,9 @@
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, CheckCircle2, ChefHat, Clock, RefreshCw, ShoppingBag } from 'lucide-react';
 import { getCocinaOrders, marcarListo } from '../../api/ventas';
 import { usePermisos } from '../../hooks/usePermisos';
+import socket from '../../socket';
 
 function tiempoTranscurrido(fecha) {
   const mins = Math.floor((Date.now() - new Date(fecha)) / 60000);
@@ -18,9 +20,16 @@ export default function CocinaPage() {
   const { data: pedidos = [], isLoading, dataUpdatedAt, refetch, isFetching } = useQuery({
     queryKey: ['cocina'],
     queryFn: getCocinaOrders,
-    refetchInterval: 8_000,
     enabled: puedeVer,
   });
+
+  useEffect(() => {
+    function onActualizar() {
+      qc.invalidateQueries({ queryKey: ['cocina'] });
+    }
+    socket.on('restaurante:actualizar', onActualizar);
+    return () => socket.off('restaurante:actualizar', onActualizar);
+  }, [qc]);
 
   const marcar = useMutation({
     mutationFn: (id) => marcarListo(id),
